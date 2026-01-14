@@ -33,41 +33,7 @@ def main():
     |------|----------|----------|-------------|
     | 电导率 | ~0.98 | ~0.95 | ~0.15 (ln-scale) |
     | 粘度 | ~0.96 | ~0.92 | ~0.12 (ln-scale) |
-    
-    ### 🔬 特征工程架构
-    
-    ```
-    Layer 0: 基础物性 (eps_mix, ln_eta0_mix, DN_mix, ...)
-        ↓
-    Layer 1: 结构分组 (frac_cyclic, frac_linear, frac_ether)
-        ↓
-    Layer 2: 协同效应 (synergy_carb)
-        ↓
-    Layer 3: 温度耦合 (eps_over_T, ln_eta_ideal_T)
-        ↓
-    Layer 4: 盐效应门控 (salt_x_cyclic, salt_x_linear_hi/lo)
-    ```
-    
-    ### 🛠️ 技术栈
-    
-    - **机器学习**: CatBoost (梯度提升树)
-    - **特征工程**: NumPy, Pandas
-    - **Web 框架**: Streamlit
-    - **可视化**: Plotly, Matplotlib
-    
-    ### 📁 项目结构
-    
-    ```
-    electrolyte-predictor/
-    ├── app.py                  # 主入口
-    ├── core/                   # 核心模块
-    │   ├── predictor.py        # 预测引擎
-    │   ├── formula_utils.py    # 配方工具
-    │   ├── solvent_database.py # 溶剂数据库
-    │   └── solvent_mixture_features.py
-    ├── pages/                  # 页面
-    └── models/                 # 模型文件
-    ```
+
     
     ### 📚 参考文献
     
@@ -78,7 +44,7 @@ def main():
     
     ### ⚠️ 使用限制
     
-    - 温度范围: -40°C ~ 80°C
+    - 温度范围: 暂不支持过高或过低
     - 浓度范围: 0 ~ 5 mol/L
     - 支持的盐: LiPF6, LiFSI, LiTFSI, LiBF4, LiBOB, LiDFOB, LiClO4
     - 溶剂: 需在数据库中有物性数据

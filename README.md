@@ -28,14 +28,6 @@ models/
 └── viscosity_catboost.pkl      # 粘度模型
 ```
 
-### 3. 启动应用
-
-```bash
-streamlit run app.py
-```
-
-然后在浏览器中打开 http://localhost:8501
-
 ## 项目结构
 
 ```
@@ -104,9 +96,8 @@ electrolyte-predictor/
 
 ## 温度范围
 
-- 最低: -40°C (233.15 K)
-- 最高: 80°C (353.15 K)
 - 默认: 25°C (298.15 K)
+- 暂不支持过高或过低
 
 ## 模型训练
 
@@ -122,6 +113,3 @@ electrolyte-predictor/
 - **数据处理**: Pandas, NumPy
 - **可视化**: Plotly, Matplotlib
 
-## 许可证
-
-MIT License
