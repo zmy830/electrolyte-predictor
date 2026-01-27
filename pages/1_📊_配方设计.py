@@ -352,13 +352,12 @@ def main():
                     if salt != "NONE":
                         st.write(f"- 浓度: {conc} {conc_unit}")
                 
-                # ========== 下载功能 ==========
+                  # ========== 下载功能 ==========
                 st.markdown("---")
                 st.subheader("📥 导出预测结果")
                 
                 # 构建下载数据
                 download_data = {
-                    # 实验条件
                     "温度_C": temp_c,
                     "温度_K": T_K,
                     "盐种类": salt,
@@ -368,29 +367,24 @@ def main():
                 
                 # 添加溶剂配方（摩尔分数）
                 for solvent, frac in mole_frac.items():
-                    download_data[f"frac_{solvent}"] = round(frac, 4)
+                    download_data[f"{solvent}_摩尔分数"] = round(frac, 4)
                 
-                # 添加质量比（如果是质量比输入）
-                if input_mode == "质量比 (%)":
-                    total = sum(formula_dict.values())
-                    for solvent, mass in formula_dict.items():
-                        download_data[f"mass_{solvent}_percent"] = round(mass / total * 100, 2)
+                # 添加质量比
+                total = sum(formula_dict.values())
+                for solvent, mass in formula_dict.items():
+                    download_data[f"{solvent}_质量百分比"] = round(mass / total * 100, 2)
                 
-                # 添加预测结果
+                # 添加预测结果（只保留核心数据）
                 cond = result["conductivity"]
                 visc = result["viscosity"]
                 
                 if cond["success"]:
                     download_data["电导率_mS_cm"] = round(cond['k_pred_final'], 4)
-                    download_data["电导率_LiPF6当量"] = round(cond['k_pred_base'], 4)
-                    download_data["盐修正系数"] = round(cond['salt_correction'], 4)
                 else:
                     download_data["电导率_mS_cm"] = "预测失败"
                 
                 if visc["success"]:
                     download_data["粘度_mPa_s"] = round(visc['eta_pred'], 4)
-                    download_data["粘度_Arrhenius基线"] = round(np.exp(visc['ln_eta_ideal']), 4)
-                    download_data["粘度_残差"] = round(visc['residual'], 4)
                 else:
                     download_data["粘度_mPa_s"] = "预测失败"
                 
