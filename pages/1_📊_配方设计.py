@@ -109,7 +109,7 @@ def main():
         st.markdown("---")
         
         # 盐配置
-        st.subheader("🧂 盐配置")
+        st.subheader("⚛️ 盐配置")
         
         salt_list = get_salt_list()
         salt = st.selectbox(
@@ -138,8 +138,8 @@ def main():
         
         st.markdown("---")
         
-        # 预测按钮
-        predict_btn = st.button("🔮 开始预测", use_container_width=True, type="primary")
+        # 预测按钮（初始化，后面会根据条件更新）
+        predict_disabled = False  # 默认可用
     
     # ========== 主面板 ==========
     
@@ -172,6 +172,9 @@ def main():
         # 输入模式选择
         input_mode = st.radio("输入模式", ["质量比 (%)", "摩尔分数"], horizontal=True)
         
+        # 确定最大值
+        max_total = 100.0 if input_mode == "质量比 (%)" else 1.0
+        
         # 溶剂列表
         all_solvents = solvent_db.get_solvent_list()
         
@@ -191,14 +194,22 @@ def main():
                         break
                 st.rerun()
         
+        with col2:
+            st.caption("⚠️ 最后一个溶剂会自动补齐至 100%（或 1.0）")
+        
+        # 计算前 N-1 项之和
+        n_solvents = len(st.session_state.formula_solvents)
+        
         # 显示溶剂输入行
         formula_data = []
-        total_mass = 0.0
+        sum_previous = 0.0  # 前 N-1 项之和
         
         for i, (solvent, mass) in enumerate(zip(
             st.session_state.formula_solvents,
             st.session_state.formula_masses
         )):
+            is_last = (i == n_solvents - 1) and (n_solvents > 1)
+            
             col1, col2, col3, col4 = st.columns([2, 2, 1, 0.5])
             
             with col1:
@@ -212,59 +223,147 @@ def main():
                 st.session_state.formula_solvents[i] = new_solvent
             
             with col2:
-                if input_mode == "质量比 (%)":
-                    new_mass = st.number_input(
-                        "质量比",
-                        min_value=0.0,
-                        max_value=100.0,
-                        value=float(mass),
-                        step=5.0,
-                        key=f"mass_{i}",
-                        label_visibility="collapsed",
-                    )
+                if is_last:
+                    # 最后一个溶剂：自动计算补齐值
+                    if input_mode == "质量比 (%)":
+                        auto_value = max(0.0, 100.0 - sum_previous)
+                        st.number_input(
+                            "质量比",
+                            value=auto_value,
+                            key=f"mass_{i}",
+                            label_visibility="collapsed",
+                            disabled=True,
+                            format="%.2f",
+                        )
+                        new_mass = auto_value
+                    else:
+                        auto_value = max(0.0, 1.0 - sum_previous / 100)
+                        st.number_input(
+                            "摩尔分数",
+                            value=auto_value,
+                            key=f"mass_{i}",
+                            label_visibility="collapsed",
+                            disabled=True,
+                            format="%.4f",
+                        )
+                        new_mass = auto_value * 100  # 内部用百分比存储
+                    
+                    st.session_state.formula_masses[i] = new_mass
                 else:
-                    new_mass = st.number_input(
-                        "摩尔分数",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=float(mass) / 100 if mass <= 1 else float(mass) / 100,
-                        step=0.05,
-                        key=f"mass_{i}",
-                        label_visibility="collapsed",
-                    )
-                    new_mass = new_mass * 100  # 内部用百分比存储
-                st.session_state.formula_masses[i] = new_mass
+                    # 非最后一个溶剂：可编辑
+                    if n_solvents == 1:
+                        # 只有一个溶剂时，强制 100%
+                        if input_mode == "质量比 (%)":
+                            st.number_input(
+                                "质量比",
+                                value=100.0,
+                                key=f"mass_{i}",
+                                label_visibility="collapsed",
+                                disabled=True,
+                                format="%.2f",
+                            )
+                            new_mass = 100.0
+                        else:
+                            st.number_input(
+                                "摩尔分数",
+                                value=1.0,
+                                key=f"mass_{i}",
+                                label_visibility="collapsed",
+                                disabled=True,
+                                format="%.4f",
+                            )
+                            new_mass = 100.0
+                    else:
+                        if input_mode == "质量比 (%)":
+                            new_mass = st.number_input(
+                                "质量比",
+                                min_value=0.0,
+                                max_value=100.0,
+                                value=float(mass),
+                                step=5.0,
+                                key=f"mass_{i}",
+                                label_visibility="collapsed",
+                            )
+                        else:
+                            input_val = float(mass) / 100 if mass <= 100 else float(mass) / 100
+                            new_val = st.number_input(
+                                "摩尔分数",
+                                min_value=0.0,
+                                max_value=1.0,
+                                value=min(1.0, input_val),
+                                step=0.05,
+                                key=f"mass_{i}",
+                                label_visibility="collapsed",
+                                format="%.4f",
+                            )
+                            new_mass = new_val * 100  # 内部用百分比存储
+                    
+                    st.session_state.formula_masses[i] = new_mass
+                    sum_previous += new_mass
             
             with col3:
                 props = solvent_db.get_properties(new_solvent)
                 if props:
                     st.caption(props.get("name_cn", ""))
+                if is_last:
+                    st.caption("🔄 自动")
             
             with col4:
-                if len(st.session_state.formula_solvents) > 1:
+                if n_solvents > 1:
                     if st.button("✕", key=f"del_{i}"):
                         st.session_state.formula_solvents.pop(i)
                         st.session_state.formula_masses.pop(i)
                         st.rerun()
             
+            # 收集配方数据
             if new_mass > 0:
                 formula_data.append((new_solvent, new_mass))
-                total_mass += new_mass
         
-        # 显示总和
+        # 计算总和
+        total_mass = sum(st.session_state.formula_masses)
+        
+        # 显示总和与状态
         st.markdown("---")
         col1, col2 = st.columns(2)
+        
+        # 检查是否超出
+        is_over = sum_previous > (100.0 if input_mode == "质量比 (%)" else 100.0)
+        
         with col1:
             if input_mode == "质量比 (%)":
-                color = "green" if abs(total_mass - 100) < 0.1 else "red"
-                st.markdown(f"**总计**: :{color}[{total_mass:.1f}%]")
+                if is_over:
+                    st.markdown(f"**总计**: :red[{sum_previous:.1f}%] ⚠️ 前 {n_solvents-1} 项已超过 100%")
+                    predict_disabled = True
+                else:
+                    st.markdown(f"**总计**: :green[100.0%] ✓")
             else:
-                total_frac = total_mass / 100
-                color = "green" if abs(total_frac - 1.0) < 0.01 else "red"
-                st.markdown(f"**总计**: :{color}[{total_frac:.3f}]")
+                if is_over:
+                    st.markdown(f"**总计**: :red[{sum_previous/100:.4f}] ⚠️ 前 {n_solvents-1} 项已超过 1.0")
+                    predict_disabled = True
+                else:
+                    st.markdown(f"**总计**: :green[1.0000] ✓")
         
         with col2:
-            st.caption("💡 输入会自动归一化")
+            if is_over:
+                st.error("❌ 请减少前面溶剂的配比")
+            elif n_solvents > 1:
+                last_solvent = st.session_state.formula_solvents[-1]
+                last_value = st.session_state.formula_masses[-1]
+                if input_mode == "质量比 (%)":
+                    st.success(f"✓ {last_solvent} 自动补齐为 {last_value:.2f}%")
+                else:
+                    st.success(f"✓ {last_solvent} 自动补齐为 {last_value/100:.4f}")
+    
+    # 侧边栏预测按钮
+    with st.sidebar:
+        predict_btn = st.button(
+            "🔮 开始预测", 
+            use_container_width=True, 
+            type="primary",
+            disabled=predict_disabled,
+        )
+        if predict_disabled:
+            st.warning("请先修正配方比例")
     
     # ----- Tab 2: 预测结果 -----
     with tab2:
@@ -273,14 +372,17 @@ def main():
             is_valid, err_msg = validate_conditions(T_K, conc, salt, conc_unit)
             if not is_valid:
                 st.error(f"条件验证失败: {err_msg}")
+            elif predict_disabled:
+                st.error("配方比例有误，请返回配方输入页修正")
             else:
                 # 构建配方
                 formula_dict = {}
-                for solvent, mass in formula_data:
-                    if solvent in formula_dict:
-                        formula_dict[solvent] += mass
-                    else:
-                        formula_dict[solvent] = mass
+                for solvent, mass in zip(st.session_state.formula_solvents, st.session_state.formula_masses):
+                    if mass > 0:
+                        if solvent in formula_dict:
+                            formula_dict[solvent] += mass
+                        else:
+                            formula_dict[solvent] = mass
                 
                 # 归一化
                 if input_mode == "质量比 (%)":
@@ -343,7 +445,7 @@ def main():
                 with col1:
                     st.markdown("**溶剂组成 (摩尔分数)**")
                     for solvent, frac in mole_frac.items():
-                        st.write(f"- {solvent}: {frac:.3f}")
+                        st.write(f"- {solvent}: {frac:.4f}")
                 
                 with col2:
                     st.markdown("**实验条件**")
@@ -352,9 +454,9 @@ def main():
                     if salt != "NONE":
                         st.write(f"- 浓度: {conc} {conc_unit}")
                 
-                  # ========== 下载功能 ==========
+                # ========== 下载功能 ==========
                 st.markdown("---")
-                st.subheader("📥 导出预测结果")
+                st.subheader(" 导出预测结果")
                 
                 # 构建下载数据
                 download_data = {
@@ -484,7 +586,7 @@ def main():
                 # 下载按钮
                 csv = result_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
-                    label="下载结果",
+                    label="📥 下载结果",
                     data=csv,
                     file_name="prediction_results.csv",
                     mime="text/csv",
