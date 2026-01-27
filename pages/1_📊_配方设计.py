@@ -351,6 +351,112 @@ def main():
                     st.write(f"- 盐: {salt}")
                     if salt != "NONE":
                         st.write(f"- 浓度: {conc} {conc_unit}")
+                
+                # ========== 下载功能 ==========
+                st.markdown("---")
+                st.subheader("📥 导出预测结果")
+                
+                # 构建下载数据
+                download_data = {
+                    # 实验条件
+                    "温度_C": temp_c,
+                    "温度_K": T_K,
+                    "盐种类": salt,
+                    "盐浓度": conc,
+                    "浓度单位": conc_unit,
+                }
+                
+                # 添加溶剂配方（摩尔分数）
+                for solvent, frac in mole_frac.items():
+                    download_data[f"frac_{solvent}"] = round(frac, 4)
+                
+                # 添加质量比（如果是质量比输入）
+                if input_mode == "质量比 (%)":
+                    total = sum(formula_dict.values())
+                    for solvent, mass in formula_dict.items():
+                        download_data[f"mass_{solvent}_percent"] = round(mass / total * 100, 2)
+                
+                # 添加预测结果
+                cond = result["conductivity"]
+                visc = result["viscosity"]
+                
+                if cond["success"]:
+                    download_data["电导率_mS_cm"] = round(cond['k_pred_final'], 4)
+                    download_data["电导率_LiPF6当量"] = round(cond['k_pred_base'], 4)
+                    download_data["盐修正系数"] = round(cond['salt_correction'], 4)
+                else:
+                    download_data["电导率_mS_cm"] = "预测失败"
+                
+                if visc["success"]:
+                    download_data["粘度_mPa_s"] = round(visc['eta_pred'], 4)
+                    download_data["粘度_Arrhenius基线"] = round(np.exp(visc['ln_eta_ideal']), 4)
+                    download_data["粘度_残差"] = round(visc['residual'], 4)
+                else:
+                    download_data["粘度_mPa_s"] = "预测失败"
+                
+                # 下载按钮
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    # CSV 下载
+                    csv_df = pd.DataFrame([download_data])
+                    csv_data = csv_df.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(
+                        label="📄 下载 CSV",
+                        data=csv_data,
+                        file_name=f"prediction_{salt}_{temp_c}C.csv",
+                        mime="text/csv",
+                    )
+                
+                with col2:
+                    # JSON 下载
+                    import json
+                    json_data = json.dumps(download_data, ensure_ascii=False, indent=2)
+                    st.download_button(
+                        label="📋 下载 JSON",
+                        data=json_data.encode('utf-8'),
+                        file_name=f"prediction_{salt}_{temp_c}C.json",
+                        mime="application/json",
+                    )
+                
+                with col3:
+                    # 复制到剪贴板的文本格式
+                    text_lines = [
+                        "=" * 40,
+                        "电解液配方预测结果",
+                        "=" * 40,
+                        "",
+                        "【实验条件】",
+                        f"  温度: {temp_c:.1f}°C ({T_K:.2f} K)",
+                        f"  盐: {salt}",
+                        f"  浓度: {conc} {conc_unit}",
+                        "",
+                        "【溶剂配方 (摩尔分数)】",
+                    ]
+                    for solvent, frac in mole_frac.items():
+                        text_lines.append(f"  {solvent}: {frac:.4f}")
+                    
+                    text_lines.extend([
+                        "",
+                        "【预测结果】",
+                        f"  电导率: {cond['k_pred_final']:.2f} mS/cm" if cond["success"] else "  电导率: 预测失败",
+                        f"  粘度: {visc['eta_pred']:.2f} mPa·s" if visc["success"] else "  粘度: 预测失败",
+                        "",
+                        "=" * 40,
+                    ])
+                    text_report = "\n".join(text_lines)
+                    
+                    st.download_button(
+                        label="📝 下载报告",
+                        data=text_report.encode('utf-8'),
+                        file_name=f"prediction_{salt}_{temp_c}C.txt",
+                        mime="text/plain",
+                    )
+                
+                # 显示预览
+                with st.expander("👀 预览下载内容"):
+                    st.json(download_data)
+                
         else:
             st.info("👈 请在侧边栏设置条件，然后点击「开始预测」")
     
@@ -384,7 +490,7 @@ def main():
                 # 下载按钮
                 csv = result_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
-                    label="📥 下载结果",
+                    label="下载结果",
                     data=csv,
                     file_name="prediction_results.csv",
                     mime="text/csv",
